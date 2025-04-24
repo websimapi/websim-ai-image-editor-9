@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Editor</title>
+    <style>
+        :root {
+            --primary: #3a86ff;
+            --secondary: #8338ec;
+            --accent: #ff006e;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --success: #38b000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2c2c2c;
+            color: var(--light);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background-color: #1a1a1a;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #333;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #444;
+            overflow-y: auto;
+        }
+
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #222;
+            overflow: auto;
+            position: relative;
+        }
+
+        #canvas {
+            background-color: white;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel {
+            margin-bottom: 20px;
+        }
+
+        .panel h3 {
+            margin-bottom: 10px;
+            color: var(--primary);
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
+        }
+
+        .tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tool, .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            background-color: #444;
+            transition: all 0.2s;
+        }
+
+        .tool:hover, .color-option:hover {
+            background-color: #555;
+        }
+
+        .tool.active, .color-option.active {
+            background-color: var(--primary);
+        }
+
+        .tool svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--light);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #2171ff;
+        }
+
+        .colors {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .color-option {
+            border: 2px solid #666;
+        }
+
+        #customColor {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .transparency-slider {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .layers-list {
+            list-style: none;
+            margin-top: 10px;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background-color: #444;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .layer-item.active {
+            background-color: var(--primary);
+        }
+
+        .layer-visibility {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .prompt-input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #444;
+            border: 1px solid #555;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .aspectRatio-select {
+            padding: 8px;
+            width: 100%;
+            background-color: #444;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .bottom-panel {
+            background-color: #1a1a1a;
+            padding: 10px;
+            border-top: 1px solid #444;
+        }
+
+        .image-generation-status {
+            text-align: center;
+            color: #aaa;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AI Image Editor</h1>
+        <button id="newImageBtn">New Image</button>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="panel">
+                <h3>Tools</h3>
+                <div class="tools">
+                    <div class="tool active" data-tool="brush" title="Brush">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M7.127 22.562l-7.127 1.438 1.438-7.128 5.689 5.69zm1.414-1.414l11.228-11.225-5.69-5.692-11.227 11.227 5.689 5.69zm9.768-21.148l-2.816 2.817 5.691 5.691 2.816-2.819-5.691-5.689z"/>
+                        </svg>
+                    </div>
+                    <div class="tool" data-tool="eraser" title="Eraser">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M5.662 23l-5.369-5.365c-.195-.195-.293-.45-.293-.707 0-.256.098-.512.293-.707l14.929-14.928c.195-.194.451-.293.707-.293.255 0 .512.099.707.293l7.071 7.073c.196.195.293.451.293.708 0 .256-.097.511-.293.707l-11.216 11.219h5.514v2h-12.343zm3.657-2l-5.486-5.486-1.419 1.414 4.076 4.072h2.829zm6.605-17.581l-10.677 10.68 5.658 5.659 10.676-10.682-5.657-5.657z"/>
+                        </svg>
+                    </div>
+                    <div class="tool" data-tool="select" title="Select">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M8.294 13.623l-4.294 3.377 12-12v5h1c4.971 0 9 4.029 9 9s-4.029 9-9 9c-2.042 0-3.921-.698-5.419-1.867l.667-1.104c1.264.964 2.85 1.541 4.571 1.541 3.59 0 6.5-2.91 6.5-6.5s-2.91-6.5-6.5-6.5v3l-8.525-3.947z"/>
+                        </svg>
+                    </div>
+                    <div class="tool" data-tool="magicWand" title="Magic Wand">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M8 10.5c0 .827-.673 1.5-1.5 1.5s-1.5-.673-1.5-1.5.673-1.5 1.5-1.5 1.5.673 1.5 1.5zm16 6.667c0 3.129-2.538 5.666-5.667 5.666-3.128 0-5.666-2.537-5.666-5.666 0-3.129 2.538-5.667 5.666-5.667 3.129 0 5.667 2.538 5.667 5.667zm-15.333-8.333c0 1.38-1.119 2.5-2.5 2.5s-2.5-1.12-2.5-2.5 1.119-2.5 2.5-2.5 2.5 1.12 2.5 2.5zm-3.667 8.333c0 1.38-1.119 2.5-2.5 2.5s-2.5-1.12-2.5-2.5 1.119-2.5 2.5-2.5 2.5 1.12 2.5 2.5zm11-11c0 1.38-1.119 2.5-2.5 2.5s-2.5-1.12-2.5-2.5 1.119-2.5 2.5-2.5 2.5 1.12 2.5 2.5zm-3.667 4.333c0 1.38-1.119 2.5-2.5 2.5s-2.5-1.12-2.5-2.5 1.119-2.5 2.5-2.5 2.5 1.12 2.5 2.5z"/>
+                        </svg>
+                    </div>
+                    <div class="tool" data-tool="fill" title="Fill">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M21.143 9.667c-.733-1.392-1.914-3.05-3.617-4.753-2.977-2.978-5.478-3.914-6.785-3.914-.414 0-.708.094-.86.246l-1.361 1.36c-1.899-.236-3.42.106-4.294.983-.876.875-1.164 2.159-.792 3.523.492 1.806 2.305 4.049 5.905 5.375.038.323.157.638.405.885.588.588 1.534.589 2.121 0s.589-1.534 0-2.121c-.248-.248-.56-.367-.882-.406-2.329-.863-3.89-2.297-4.392-3.623-.39-1.027-.247-1.713.143-2.102.391-.389 1.113-.58 2.153-.156.285.118.561.238.86.238.528 0 1.036-.21 1.41-.583l1.162-1.162c.098-.098.196-.196.284-.284 1.677-.002 4.003.87 6.93 3.797 1.5 1.499 2.572 2.911 3.258 4.152.169.312.334.636.468.959.33.798.141 1.38-.173 1.691-.313.312-.895.501-1.692.172-1.209-.501-2.773-1.902-4.336-3.465-1.045-1.043-2.136-1.001-2.952-.186-.816.816-.859 1.905.186 2.952 2.07 2.07 4.316 3.931 6.332 3.931.269 0 .52-.033.753-.098.782-.22 1.369-.77 1.648-1.547.319-.889.266-2.043-.155-3.206z"/>
+                        </svg>
+                    </div>
+                    <div class="tool" data-tool="magicFill" title="Magic Fill">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M19 10v9h-12.031v-9h12.031zm0-2h-12.031c-1.104 0-1.999.896-1.999 2v9c0 1.104.895 2 1.999 2h12.031c1.104 0 2-.896 2-2v-9c0-1.104-.896-2-2-2zm-13.032 9.718c.76 .522 1.253 1.405 1.253 2.398 0 1.601-1.299 2.9-2.9 2.9s-2.9-1.299-2.9-2.9c0-.995.496-1.879 1.252-2.398-.855-.729-1.397-1.817-1.397-3.029 0-2.209 1.791-4 4-4s4 1.791 4 4c0 1.227-.549 2.326-1.416 3.058-.857.516-1.311 1.404-1.311 2.37 0 1.601-1.299 2.9-2.9 2.9s-2.9-1.299-2.9-2.9c0-.966-.454-1.855-1.311-2.37-.867-.732-1.416-1.831-1.416-3.058 0-2.209 1.791-4 4-4-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4c2.209 0 4 1.791 4 4 0 1.212-.542 2.3-1.397 3.029zm-1.283-8.818c-1.104 0-2 .896-2 2s.896 2 2 2c1.105 0 2-.896 2-2s-.895-2-2-2z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Colors</h3>
+                <div class="colors">
+                    <div class="color-option active" style="background-color: #000000;" data-color="#000000"></div>
+                    <div class="color-option" style="background-color: #ffffff;" data-color="#ffffff"></div>
+                    <div class="color-option" style="background-color: #ff0000;" data-color="#ff0000"></div>
+                    <div class="color-option" style="background-color: #00ff00;" data-color="#00ff00"></div>
+                    <div class="color-option" style="background-color: #0000ff;" data-color="#0000ff"></div>
+                    <div class="color-option" style="background-color: #ffff00;" data-color="#ffff00"></div>
+                    <div class="color-option" style="background-color: #ff00ff;" data-color="#ff00ff"></div>
+                    <div class="color-option" style="background-color: #00ffff;" data-color="#00ffff"></div>
+                </div>
+                <input type="color" id="customColor" value="#000000">
+                <div>
+                    <label for="transparencySlider">Transparency:</label>
+                    <input type="range" id="transparencySlider" class="transparency-slider" min="0" max="100" value="0">
+                </div>
+                <button id="setTransparentBtn">Set Selection Transparent</button>
+            </div>
+
+            <div class="panel">
+                <h3>Layers</h3>
+                <ul class="layers-list" id="layersList">
+                    <!-- Layers will be added here dynamically -->
+                </ul>
+                <button id="addLayerBtn">Add New Layer</button>
+            </div>
+
+            <div class="panel">
+                <h3>AI Image Generation</h3>
+                <input type="text" class="prompt-input" id="imagePrompt" placeholder="Describe the image you want...">
+                <select id="aspectRatio" class="aspectRatio-select">
+                    <option value="1:1">Square (1:1)</option>
+                    <option value="16:9">Landscape (16:9)</option>
+                    <option value="9:16">Portrait (9:16)</option>
+                    <option value="4:3">Standard (4:3)</option>
+                    <option value="3:2">Photo (3:2)</option>
+                </select>
+                <button id="generateImageBtn">Generate Image</button>
+                <button id="magicFillBtn">Magic Fill Selection</button>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="canvas" width="800" height="600"></canvas>
+        </div>
+    </div>
+
+    <div class="bottom-panel">
+        <div class="image-generation-status" id="generationStatus"></div>
+    </div>
+
+    <div class="modal" id="newImageModal">
+        <div class="modal-content">
+            <h2>Create New Image</h2>
+            <div>
+                <label for="canvasWidth">Width:</label>
+                <input type="number" id="canvasWidth" value="800" min="100" max="3000">
+            </div>
+            <div>
+                <label for="canvasHeight">Height:</label>
+                <input type="number" id="canvasHeight" value="600" min="100" max="3000">
+            </div>
+            <button id="createNewImageBtn">Create</button>
+            <button id="cancelNewImageBtn">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // Main app state
+        const app = {
+            currentTool: 'brush',
+            currentColor: '#000000',
+            transparency: 0,
+            brushSize: 5,
+            isDrawing: false,
+            layers: [],
+            activeLayerIndex: 0,
+            selection: null,
+            lastPos: { x: 0, y: 0 }
+        };
+
+        // DOM Elements
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const tools = document.querySelectorAll('.tool');
+        const colorOptions = document.querySelectorAll('.color-option');
+        const customColorInput = document.getElementById('customColor');
+        const transparencySlider = document.getElementById('transparencySlider');
+        const layersList = document.getElementById('layersList');
+        const addLayerBtn = document.getElementById('addLayerBtn');
+        const imagePrompt = document.getElementById('imagePrompt');
+        const aspectRatioSelect = document.getElementById('aspectRatio');
+        const generateImageBtn = document.getElementById('generateImageBtn');
+        const magicFillBtn = document.getElementById('magicFillBtn');
+        const setTransparentBtn = document.getElementById('setTransparentBtn');
+        const generationStatus = document.getElementById('generationStatus');
+        const newImageBtn = document.getElementById('newImageBtn');
+        const newImageModal = document.getElementById('newImageModal');
+        const createNewImageBtn = document.getElementById('createNewImageBtn');
+        const cancelNewImageBtn = document.getElementById('cancelNewImageBtn');
+        const canvasWidthInput = document.getElementById('canvasWidth');
+        const canvasHeightInput = document.getElementById('canvasHeight');
+
+        // Initialize the app
+        function init() {
+            // Create the first layer
+            addLayer();
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Initial render
+            renderLayers();
+        }
+
+        // Layer management
+        function addLayer() {
+            const layerCanvas = document.createElement('canvas');
+            layerCanvas.width = canvas.width;
+            layerCanvas.height = canvas.height;
+            
+            const layer = {
+                canvas: layerCanvas,
+                ctx: layerCanvas.getContext('2d'),
+                visible: true,
+                name: `Layer ${app.layers.length + 1}`
+            };
+            
+            app.layers.push(layer);
+            app.activeLayerIndex = app.layers.length - 1;
+            updateLayersList();
+        }
+
+        function updateLayersList() {
+            layersList.innerHTML = '';
+            
+            app.layers.forEach((layer, index) => {
+                const layerItem = document.createElement('li');
+                layerItem.className = `layer-item ${index === app.activeLayerIndex ? 'active' : ''}`;
+                layerItem.dataset.index = index;
+                
+                const visibilityIcon = document.createElement('span');
+                visibilityIcon.className = 'layer-visibility';
+                visibilityIcon.innerHTML = layer.visible ? '👁️' : '👁️‍🗨️';
+                
+                const layerName = document.createElement('span');
+                layerName.textContent = layer.name;
+                
+                layerItem.appendChild(visibilityIcon);
+                layerItem.appendChild(layerName);
+                
+                layersList.appendChild(layerItem);
+                
+                // Event listeners for layer items
+                layerItem.addEventListener('click', () => {
+                    app.activeLayerIndex = index;
+                    updateLayersList();
+                });
+                
+                visibilityIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    layer.visible = !layer.visible;
+                    updateLayersList();
+                    renderLayers();
+                });
+            });
+        }
+
+        function renderLayers() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            app.layers.forEach(layer => {
+                if (layer.visible) {
+                    ctx.drawImage(layer.canvas, 0, 0);
+                }
+            });
+            
+            // Draw selection if exists
+            if (app.selection) {
+                ctx.strokeStyle = '#3a86ff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(
+                    app.selection.x, 
+                    app.selection.y, 
+                    app.selection.width, 
+                    app.selection.height
+                );
+            }
+        }
+
+        // Tool handling
+        function handleToolSelection(toolName) {
+            app.currentTool = toolName;
+            tools.forEach(toolBtn => {
+                toolBtn.classList.toggle('active', toolBtn.dataset.tool === toolName);
+            });
+        }
+
+        // Color handling
+        function handleColorSelection(color) {
+            app.currentColor = color;
+            customColorInput.value = color;
+            colorOptions.forEach(colorBtn => {
+                colorBtn.classList.toggle('active', colorBtn.dataset.color === color);
+            });
+        }
+
+        // Drawing functions
+        function startDrawing(e) {
+            if (!app.layers.length) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            app.isDrawing = true;
+            app.lastPos = { x, y };
+            
+            // Handle different tools
+            if (app.currentTool === 'select') {
+                app.selection = { x, y, width: 0, height: 0 };
+            } else if (app.currentTool === 'magicWand') {
+                // Simple magic wand implementation
+                const pixelData = ctx.getImageData(x, y, 1, 1).data;
+                const targetColor = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`;
+                
+                // For simplicity, let's select a square around the clicked point
+                app.selection = { x: x - 50, y: y - 50, width: 100, height: 100 };
+                renderLayers();
+            } else if (app.currentTool === 'fill') {
+                // Fill the current layer with selected color
+                const activeLayer = app.layers[app.activeLayerIndex];
+                activeLayer.ctx.fillStyle = colorWithTransparency(app.currentColor, app.transparency);
+                activeLayer.ctx.fillRect(0, 0, canvas.width, canvas.height);
+                renderLayers();
+            } else {
+                draw(x, y);
+            }
+        }
+
+        function draw(x, y) {
+            if (!app.isDrawing || !app.layers.length) return;
+            
+            const activeLayer = app.layers[app.activeLayerIndex];
+            
+            if (app.currentTool === 'brush') {
+                activeLayer.ctx.beginPath();
+                activeLayer.ctx.moveTo(app.lastPos.x, app.lastPos.y);
+                activeLayer.ctx.lineTo(x, y);
+                activeLayer.ctx.strokeStyle = colorWithTransparency(app.currentColor, app.transparency);
+                activeLayer.ctx.lineWidth = app.brushSize;
+                activeLayer.ctx.lineCap = 'round';
+                activeLayer.ctx.stroke();
+            } else if (app.currentTool === 'eraser') {
+                activeLayer.ctx.globalCompositeOperation = 'destination-out';
+                activeLayer.ctx.beginPath();
+                activeLayer.ctx.moveTo(app.lastPos.x, app.lastPos.y);
+                activeLayer.ctx.lineTo(x, y);
+                activeLayer.ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+                activeLayer.ctx.lineWidth = app.brushSize;
+                activeLayer.ctx.lineCap = 'round';
+                activeLayer.ctx.stroke();
+                activeLayer.ctx.globalCompositeOperation = 'source-over';
+            }
+            
+            app.lastPos = { x, y };
+            renderLayers();
+        }
+
+        function stopDrawing(e) {
+            if (!app.isDrawing) return;
+            
+            if (app.currentTool === 'select') {
+                // Finalize selection
+                normalizeSelection();
+            }
+            
+            app.isDrawing = false;
+            renderLayers();
+        }
+
+        function moveDrawing(e) {
+            if (!app.isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (app.currentTool === 'select') {
+                app.selection.width = x - app.selection.x;
+                app.selection.height = y - app.selection.y;
+                renderLayers();
+            } else {
+                draw(x, y);
+            }
+        }
+
+        function normalizeSelection() {
+            if (!app.selection) return;
+            
+            // Make sure width and height are positive
+            if (app.selection.width < 0) {
+                app.selection.x += app.selection.width;
+                app.selection.width = Math.abs(app.selection.width);
+            }
+            
+            if (app.selection.height < 0) {
+                app.selection.y += app.selection.height;
+                app.selection.height = Math.abs(app.selection.height);
+            }
+        }
+
+        // Helper functions
+        function colorWithTransparency(color, transparency) {
+            // Convert hex to rgba
+            if (color.startsWith('#')) {
+                const r = parseInt(color.substr(1, 2), 16);
+                const g = parseInt(color.substr(3, 2), 16);
+                const b = parseInt(color.substr(5, 2), 16);
+                const a = 1 - (transparency / 100);
+                return `rgba(${r}, ${g}, ${b}, ${a})`;
+            }
+            return color;
+        }
+
+        // AI Image Generation
+        async function generateImage() {
+            if (!imagePrompt.value.trim()) {
+                alert('Please enter an image description');
+                return;
+            }
+            
+            generationStatus.textContent = 'Generating image...';
+            
+            try {
+                const result = await websim.imageGen({
+                    prompt: imagePrompt.value,
+                    aspect_ratio: aspectRatioSelect.value
+                });
+                
+                generationStatus.textContent = 'Image generated successfully!';
+                
+                // Load the generated image
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = function() {
+                    // Create a new layer for the generated image
+                    addLayer();
+                    const newLayer = app.layers[app.layers.length - 1];
+                    
+                    // Calculate how to fit the image
+                    const scale = Math.min(
+                        canvas.width / img.width,
+                        canvas.height / img.height
+                    );
+                    
+                    const newWidth = img.width * scale;
+                    const newHeight = img.height * scale;
+                    const x = (canvas.width - newWidth) / 2;
+                    const y = (canvas.height - newHeight) / 2;
+                    
+                    newLayer.ctx.drawImage(img, x, y, newWidth, newHeight);
+                    renderLayers();
+                };
+                img.src = result.url;
+                
+            } catch (error) {
+                generationStatus.textContent = 'Error generating image: ' + error.message;
+                console.error('Image generation error:', error);
+            }
+        }
+
+        // Magic Fill with AI
+        async function magicFill() {
+            if (!app.selection || !imagePrompt.value.trim()) {
+                alert('Please make a selection and enter an image description');
+                return;
+            }
+            
+            generationStatus.textContent = 'Generating fill image...';
+            
+            try {
+                // Calculate aspect ratio of selection
+                const aspectRatio = app.selection.width / app.selection.height;
+                const aspectString = aspectRatio > 1 ? 
+                    Math.round(aspectRatio * 10) / 10 + ":1" : 
+                    "1:" + Math.round((1/aspectRatio) * 10) / 10;
+                
+                const result = await websim.imageGen({
+                    prompt: imagePrompt.value,
+                    width: Math.max(Math.round(app.selection.width), 256),
+                    height: Math.max(Math.round(app.selection.height), 256)
+                });
+                
+                generationStatus.textContent = 'Fill image generated!';
+                
+                // Load the generated image
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = function() {
+                    const activeLayer = app.layers[app.activeLayerIndex];
+                    
+                    // Draw the generated image into the selection area
+                    activeLayer.ctx.drawImage(
+                        img, 
+                        app.selection.x, 
+                        app.selection.y, 
+                        app.selection.width, 
+                        app.selection.height
+                    );
+                    
+                    renderLayers();
+                };
+                img.src = result.url;
+                
+            } catch (error) {
+                generationStatus.textContent = 'Error generating fill image: ' + error.message;
+                console.error('Magic fill error:', error);
+            }
+        }
+
+        // Set selection to transparent
+        function setSelectionTransparent() {
+            if (!app.selection) {
+                alert('Please make a selection first');
+                return;
+            }
+            
+            const activeLayer = app.layers[app.activeLayerIndex];
+            activeLayer.ctx.clearRect(
+                app.selection.x, 
+                app.selection.y, 
+                app.selection.width, 
+                app.selection.height
+            );
+            
+            renderLayers();
+        }
+
+        // Create a new image canvas
+        function createNewImage() {
+            const width = parseInt(canvasWidthInput.value);
+            const height = parseInt(canvasHeightInput.value);
+            
+            if (isNaN(width) || isNaN(height) || width < 100 || height < 100) {
+                alert('Please enter valid dimensions (minimum 100x100)');
+                return;
+            }
+            
+            // Resize canvas
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Clear layers and create a new one
+            app.layers = [];
+            app.selection = null;
+            addLayer();
+            
+            // Close modal
+            newImageModal.style.display = 'none';
+            
+            renderLayers();
+        }
+
+        // Event Listeners setup
+        function setupEventListeners() {
+            // Tool selection
+            tools.forEach(tool => {
+                tool.addEventListener('click', () => {
+                    handleToolSelection(tool.dataset.tool);
+                });
+            });
+            
+            // Color selection
+            colorOptions.forEach(colorOption => {
+                colorOption.addEventListener('click', () => {
+                    handleColorSelection(colorOption.dataset.color);
+                });
+            });
+            
+            // Custom color input
+            customColorInput.addEventListener('input', () => {
+                handleColorSelection(customColorInput.value);
+            });
+            
+            // Transparency slider
+            transparencySlider.addEventListener('input', () => {
+                app.transparency = parseInt(transparencySlider.value);
+            });
+            
+            // Canvas drawing events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', moveDrawing);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            
+            // Layer management
+            addLayerBtn.addEventListener('click', addLayer);
+            
+            // Image generation
+            generateImageBtn.addEventListener('click', generateImage);
+            
+            // Magic fill
+            magicFillBtn.addEventListener('click', magicFill);
+            
+            // Set transparent
+            setTransparentBtn.addEventListener('click', setSelectionTransparent);
+            
+            // New image
+            newImageBtn.addEventListener('click', () => {
+                newImageModal.style.display = 'flex';
+            });
+            
+            createNewImageBtn.addEventListener('click', createNewImage);
+            
+            cancelNewImageBtn.addEventListener('click', () => {
+                newImageModal.style.display = 'none';
+            });
+        }
+
+        // Initialize app
+        init();
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
